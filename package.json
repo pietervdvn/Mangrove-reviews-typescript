@@ -1,6 +1,6 @@
 {
   "name": "mangrove-reviews-typescript",
-  "version": "0.0.2",
+  "version": "0.0.5",
   "description": "A library to interface with Mangrove.reviews",
   "main": "lib/index.ts",
   "scripts": {
@@ -25,5 +25,8 @@
     "jose": "^4.11.2",
     "jwk-to-pem": "^2.0.5",
     "typescript": "^4.9.4"
+  },
+  "devDependencies": {
+    "@types/jwk-to-pem": "^2.0.1"
   }
 }

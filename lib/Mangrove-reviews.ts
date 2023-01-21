@@ -1,7 +1,7 @@
 import {Metadata, Review} from "./Review";
-import * as jwkToPem from "jwk-to-pem"
+import jwkToPem from "jwk-to-pem"
 import axios from "axios";
-import {EncryptJWT} from "jose"
+import {SignJWT} from "jose"
 import {JWTPayload} from "jose/dist/types/types";
 
 export interface QueryParameters {
@@ -16,47 +16,47 @@ export interface QueryParameters {
 
     /**
      *  Reviews by issuer with the following PEM public key.
-    */
+     */
     kid?: string
     /**
      *  Reviews issued at this UNIX time.
-    */
+     */
     iat?: number
     /**
      *  Reviews with UNIX timestamp greater than this.
-    */
+     */
     gt_iat?: number
     /**
      *  Reviews of the given subject URI.
-    */
+     */
     sub?: string
     /**
      *  Reviews with the given rating.
-    */
+     */
     rating?: number
     /**
      *  Reviews with the given opinion.
-    */
+     */
     opinion?: string
     /**
      *  Maximum number of reviews to be returned.
-    */
+     */
     limit?: number
     /**
      *  Get only reviews with opinion text.
-    */
+     */
     opinionated?: boolean
     /**
      *  Include reviews of example subjects.
-    */
+     */
     examples?: boolean
     /**
      *  Include aggregate information about review issuers.
-    */
+     */
     issuers?: boolean
     /**
      *  Include aggregate information about reviews of returned reviews.
-    */
+     */
     maresi_subjects?: boolean
 
 }
@@ -71,20 +71,19 @@ export class MangroveReviews {
      * @param {Payload} payload - Base {@link Payload} to be cleaned, it will be mutated.
      * @returns {string} Mangrove Review encoded as JWT.
      */
-    public static async signReview(keypair, payload: Review): Promise<string> {
+    public static async signReview(keypair: CryptoKeyPair, payload: Review): Promise<string> {
         payload = MangroveReviews.cleanPayload(payload)
-        const key = await jwkToPem.privateToPem(keypair.privateKey)
         const algo = 'ES256'
         const kid = await MangroveReviews.publicToPem(keypair.publicKey)
         const jwk = await crypto.subtle.exportKey('jwk', keypair.publicKey)
-        return await new EncryptJWT(<JWTPayload>payload)
+        return await new SignJWT(<JWTPayload>payload)
             .setProtectedHeader({
                 alg: algo,
                 kid,
                 jwk,
                 enc: "utf-8"
             })
-            .encrypt(key);
+            .sign(keypair.privateKey);
     }
 
     /**
@@ -103,7 +102,7 @@ export class MangroveReviews {
      * @param {Payload} payload Base {@link Payload} to be cleaned, it will be mutated.
      * @param {string} [api=ORIGINAL_API] - API endpoint used to fetch the data.
      */
-    static async signAndSubmitReview(keypair: CryptoKeyPair, payload: Review, api:string = MangroveReviews.ORIGINAL_API) {
+    static async signAndSubmitReview(keypair: CryptoKeyPair, payload: Review, api: string = MangroveReviews.ORIGINAL_API) {
         const jwt = await MangroveReviews.signReview(keypair, payload)
         return MangroveReviews.submitReview(jwt, api)
     }
@@ -114,16 +113,16 @@ export class MangroveReviews {
 
      * @param api The api-endpoint to query; default: mangrove.reviews
      */
-    public static async getReviews(query: QueryParameters, api = MangroveReviews.ORIGINAL_API): 
-        Promise<{ 
-        /** A list of reviews satisfying the query.*/
-        reviews: { 
-            signature: string,
-            jwt: string,
-            kid: string,
-            payload:            Review,
-            scheme: "geo" | string
-        }[] ,
+    public static async getReviews(query: QueryParameters, api = MangroveReviews.ORIGINAL_API):
+        Promise<{
+            /** A list of reviews satisfying the query.*/
+            reviews: {
+                signature: string,
+                jwt: string,
+                kid: string,
+                payload: Review,
+                scheme: "geo" | string
+            }[],
             /**  A map from Review identifiers (urn:maresi:<signature>) to information about the reviews of that review. */
             maresi_subjects?: any[],
             issuers?: any[]
@@ -149,7 +148,7 @@ export class MangroveReviews {
      * @param {string} pem - Reviewer public key in PEM format.
      * @param {string} [api=ORIGINAL_API] - API endpoint used to fetch the data.
      */
-    public static getIssuer(pem, api = MangroveReviews.ORIGINAL_API) {
+    public static getIssuer(pem: string, api = MangroveReviews.ORIGINAL_API) {
         return axios.get(`${api}/issuer/${encodeURIComponent(pem)}`).then(({data}) => data)
     }
 
@@ -160,7 +159,19 @@ export class MangroveReviews {
      * @param {string[]} [query.pems] A list of issuer PEM public keys to get aggregates for.
      * @param {string} [api=ORIGINAL_API] - API endpoint used to fetch the data.
      */
-    public static batchAggregate(query, api = MangroveReviews.ORIGINAL_API) {
+    public static batchAggregate(query: { subs?: string[], pems?: string[] }, api = MangroveReviews.ORIGINAL_API):
+        null |
+        Promise<{
+            "issuers": Record<string, { count: number, neutrality: number }>,
+            "subjects": Record<string, {
+                "confirmed_count": number,
+                "count": number,
+                "opinion_count": number,
+                "positive_count": NamedNodeMap,
+                "quality": number,
+                "sub": string
+            }>
+        }> {
         if (!query.pems && !query.subs) {
             return null
         }
@@ -190,7 +201,7 @@ export class MangroveReviews {
      * Import keys which were exported with `keypairToJwk`.
      * @param jwk - Private JSON Web Key (JWK) to be converted in to a WebCrypto keypair.
      */
-    public static async jwkToKeypair(jwk) {
+    public static async jwkToKeypair(jwk: JsonWebKey & {metadata: string} ) {
         // Do not mutate the argument.
         let key = {...jwk}
         if (!key || key.metadata !== MangroveReviews.PRIVATE_KEY_METADATA) {
@@ -233,13 +244,13 @@ export class MangroveReviews {
      * You can later import it back with `jwkToKeypair`.
      * @param keypair - WebCrypto key pair, can be generate with `generateKeypair`.
      */
-    public static async keypairToJwk(keypair) {
+    public static async keypairToJwk(keypair: CryptoKeyPair) {
         const s = await crypto.subtle.exportKey('jwk', keypair.privateKey)
         s["metadata"] = MangroveReviews.PRIVATE_KEY_METADATA
         return s
     }
 
-    public static u8aToString(buf: ArrayBuffer) : string{
+    public static u8aToString(buf: ArrayBuffer): string {
         return new TextDecoder().decode(buf);
         //return String.fromCharCode.apply(null, new Uint8Array(buf))
     }
@@ -248,15 +259,15 @@ export class MangroveReviews {
      * Get PEM represenation of the user "password".
      * @param key - Private WebCrypto key to be exported.
      */
-    public static async privateToPem(key) {
+    public static async privateToPem(key: CryptoKey) {
         try {
             const exported: ArrayBuffer = await crypto.subtle.exportKey('pkcs8', key)
-            const exportedAsBase64 =  btoa(String.fromCharCode(...new Uint8Array(exported)));
+            const exportedAsBase64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
             return `-----BEGIN PRIVATE KEY-----\n${exportedAsBase64}\n-----END PRIVATE KEY-----`
         } catch {
             // Workaround for Firefox webcrypto not working.
-            const exported = await crypto.subtle.exportKey('jwk', key)
-            return jwkToPem(exported, {private: true})
+            const exported: JsonWebKey = await crypto.subtle.exportKey('jwk', key)
+            return jwkToPem(<any> exported, {private: true})
         }
     }
 
@@ -267,7 +278,7 @@ export class MangroveReviews {
      */
     public static async publicToPem(key: CryptoKey): Promise<string> {
         const exported: ArrayBuffer = await crypto.subtle.exportKey('spki', key)
-        const exportedAsBase64 =  btoa(String.fromCharCode(...new Uint8Array(exported)));
+        const exportedAsBase64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
 
         // Do not add new lines so that its copyable from plain string representation.
         return `-----BEGIN PUBLIC KEY-----${exportedAsBase64}-----END PUBLIC KEY-----`
@@ -301,7 +312,6 @@ export class MangroveReviews {
         payload.metadata = meta
         return payload
     }
-
 
 
 }

@@ -14,7 +14,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": false,
     "removeComments": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "preserveConstEnums": true,
     "suppressImplicitAnyIndexErrors": true
   },
