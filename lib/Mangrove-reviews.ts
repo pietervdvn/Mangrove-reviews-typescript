@@ -8,56 +8,56 @@ export interface QueryParameters {
     /**
      * Search for reviews that have this string in `sub` or `opinion` field.
      */
-    q: string,
+    q?: string,
     /**
      * Search for review with this `signature` value.
      */
-    signature: string
+    signature?: string
 
     /**
      *  Reviews by issuer with the following PEM public key.
     */
-    kid: string
+    kid?: string
     /**
      *  Reviews issued at this UNIX time.
     */
-    iat: number
+    iat?: number
     /**
      *  Reviews with UNIX timestamp greater than this.
     */
-    gt_iat: number
+    gt_iat?: number
     /**
      *  Reviews of the given subject URI.
     */
-    sub: string
+    sub?: string
     /**
      *  Reviews with the given rating.
     */
-    rating: number
+    rating?: number
     /**
      *  Reviews with the given opinion.
     */
-    opinion: string
+    opinion?: string
     /**
      *  Maximum number of reviews to be returned.
     */
-    limit: number
+    limit?: number
     /**
      *  Get only reviews with opinion text.
     */
-    opinionated: boolean
+    opinionated?: boolean
     /**
      *  Include reviews of example subjects.
     */
-    examples: boolean
+    examples?: boolean
     /**
      *  Include aggregate information about review issuers.
     */
-    issuers: boolean
+    issuers?: boolean
     /**
      *  Include aggregate information about reviews of returned reviews.
     */
-    maresi_subjects: boolean
+    maresi_subjects?: boolean
 
 }
 
@@ -93,7 +93,7 @@ export class MangroveReviews {
      * @param {string} [api=ORIGINAL_API] API endpoint used to fetch the data.
      * @returns {Promise} Resolves to "true" in case of successful insertion or rejects with errors.
      */
-    public static submitReview(jwt, api = MangroveReviews.ORIGINAL_API) {
+    public static submitReview(jwt: string, api: string = MangroveReviews.ORIGINAL_API) {
         return axios.put(`${api}/submit/${jwt}`)
     }
 
@@ -103,7 +103,7 @@ export class MangroveReviews {
      * @param {Payload} payload Base {@link Payload} to be cleaned, it will be mutated.
      * @param {string} [api=ORIGINAL_API] - API endpoint used to fetch the data.
      */
-    static async signAndSubmitReview(keypair, payload, api = MangroveReviews.ORIGINAL_API) {
+    static async signAndSubmitReview(keypair: CryptoKeyPair, payload: Review, api:string = MangroveReviews.ORIGINAL_API) {
         const jwt = await MangroveReviews.signReview(keypair, payload)
         return MangroveReviews.submitReview(jwt, api)
     }
@@ -114,7 +114,20 @@ export class MangroveReviews {
 
      * @param api The api-endpoint to query; default: mangrove.reviews
      */
-    public static async getReviews(query: QueryParameters, api = MangroveReviews.ORIGINAL_API): Promise<Review[]> {
+    public static async getReviews(query: QueryParameters, api = MangroveReviews.ORIGINAL_API): 
+        Promise<{ 
+        /** A list of reviews satisfying the query.*/
+        reviews: { 
+            signature: string,
+            jwt: string,
+            kid: string,
+            payload:            Review,
+            scheme: "geo" | string
+        }[] ,
+            /**  A map from Review identifiers (urn:maresi:<signature>) to information about the reviews of that review. */
+            maresi_subjects?: any[],
+            issuers?: any[]
+        }> {
         const {data} = await axios.get(`${api}/reviews`, {
             params: query,
             headers: {'Content-Type': 'application/json'}
@@ -238,8 +251,7 @@ export class MangroveReviews {
     public static async privateToPem(key) {
         try {
             const exported: ArrayBuffer = await crypto.subtle.exportKey('pkcs8', key)
-            const exportedAsString = MangroveReviews.u8aToString(exported)
-            const exportedAsBase64 = window.btoa(exportedAsString)
+            const exportedAsBase64 =  btoa(String.fromCharCode(...new Uint8Array(exported)));
             return `-----BEGIN PRIVATE KEY-----\n${exportedAsBase64}\n-----END PRIVATE KEY-----`
         } catch {
             // Workaround for Firefox webcrypto not working.
@@ -255,8 +267,8 @@ export class MangroveReviews {
      */
     public static async publicToPem(key: CryptoKey): Promise<string> {
         const exported: ArrayBuffer = await crypto.subtle.exportKey('spki', key)
-        const exportedAsString = MangroveReviews.u8aToString(exported)
-        const exportedAsBase64 = btoa(exportedAsString)
+        const exportedAsBase64 =  btoa(String.fromCharCode(...new Uint8Array(exported)));
+
         // Do not add new lines so that its copyable from plain string representation.
         return `-----BEGIN PUBLIC KEY-----${exportedAsBase64}-----END PUBLIC KEY-----`
     }

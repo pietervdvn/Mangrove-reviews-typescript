@@ -5,7 +5,7 @@ export interface Metadata extends JWTPayload{
     /**
      * Identity of the client used to leave the review, gets populated if not provided.
      */
-    client_id: string
+    client_id?: string
 
     /**
      * Nickname of the reviewer.
@@ -66,7 +66,7 @@ export interface Review {
      * Unix timestamp of when review was issued,
      *  gets filled in automatically if not provided.
      */
-    iat: number
+    iat?: number
 
     /**
      * Array of up to 5 images to be included.
