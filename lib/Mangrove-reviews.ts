@@ -75,12 +75,12 @@ export class MangroveReviews {
         payload = MangroveReviews.cleanPayload(payload)
         const algo = 'ES256'
         const kid = await MangroveReviews.publicToPem(keypair.publicKey)
-        const jwk = await crypto.subtle.exportKey('jwk', keypair.publicKey)
+        const jwk = JSON.stringify(await crypto.subtle.exportKey('jwk', keypair.publicKey))
         return await new SignJWT(<JWTPayload>payload)
             .setProtectedHeader({
                 alg: algo,
                 kid,
-                jwk,
+                jwk: <any> jwk,
                 enc: "utf-8"
             })
             .sign(keypair.privateKey);
