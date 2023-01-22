@@ -1,8 +1,9 @@
 {
   "name": "mangrove-reviews-typescript",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A library to interface with Mangrove.reviews",
-  "main": "lib/index.ts",
+  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "build": "tsc -project ."
   },
