@@ -1,4 +1,10 @@
+# This repository moved
+
+Find us at https://source.mapcomplete.org/MapComplete/Mangrove-reviews-typescript
+
 # Mangrove-reviews-typescript
+
+
 
 This is a port of [mangrove-reviews](https://www.npmjs.com/package/mangrove-reviews), but which uses [jose](https://www.npmjs.com/package/jose) instead of [jsonwebtoken](https://www.npmjs.com/package/jsonwebtoken).
 The latter has a dependency which uses `Stream`, which `vite` cannot handle.
