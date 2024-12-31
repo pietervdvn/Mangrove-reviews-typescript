@@ -59,6 +59,12 @@ export interface QueryParameters {
      */
     maresi_subjects?: boolean
 
+    /**
+     * Only used for 'geo:'-queries
+     * uncertainty in meters
+     */
+    u?: number
+
 }
 
 export class MangroveReviews {
@@ -80,7 +86,7 @@ export class MangroveReviews {
             .setProtectedHeader({
                 alg: algo,
                 kid,
-                jwk: <any> jwk,
+                jwk: <any>jwk,
                 enc: "utf-8"
             })
             .sign(keypair.privateKey);
@@ -127,6 +133,21 @@ export class MangroveReviews {
             maresi_subjects?: any[],
             issuers?: any[]
         }> {
+        if (query.sub?.startsWith("geo:")) {
+            const parts = []
+            if (query.q) {
+                parts.push("q=" + encodeURIComponent(query.q))
+                delete query.q
+            }
+            if (query.u) {
+                parts.push("u=" + query.u)
+                delete query.u
+            }
+            if (parts.length > 0) {
+                query.sub = query.sub + "?" + parts.join("&")
+            }
+
+        }
         const {data} = await axios.get(`${api}/reviews`, {
             params: query,
             headers: {'Content-Type': 'application/json'}
